@@ -1,3 +1,5 @@
+"""Module containing utility functions."""
+
 import os
 import pickle
 import re
@@ -138,8 +140,8 @@ enc_protein = OneHotEncoder().fit(np.array(amino_char).reshape(-1, 1))
 enc_drug = OneHotEncoder().fit(np.array(smiles_char).reshape(-1, 1))
 
 
-def trans_protein(x):
-    temp = list(x.upper())
+def trans_protein(var_x):
+    temp = list(var_x.upper())
     temp = [i if i in amino_char else "?" for i in temp]
     if len(temp) < MAX_SEQ_PROTEIN:
         temp = temp + ["?"] * (MAX_SEQ_PROTEIN - len(temp))
@@ -148,8 +150,8 @@ def trans_protein(x):
     return temp
 
 
-def trans_drug(x):
-    temp = list(x)
+def trans_drug(var_x):
+    temp = list(var_x)
     temp = [i if i in smiles_char else "?" for i in temp]
     if len(temp) < MAX_SEQ_DRUG:
         temp = temp + ["?"] * (MAX_SEQ_DRUG - len(temp))
@@ -159,16 +161,16 @@ def trans_drug(x):
 
 
 def length_func(list_or_tensor):
-    if type(list_or_tensor) == list:
+    if isinstance(list_or_tensor, list):
         return len(list_or_tensor)
     return list_or_tensor.shape[0]
 
 
 # random_fold
-def create_fold(df, fold_seed, frac):
-    train_frac, val_frac, test_frac = frac
-    test = df.sample(frac=test_frac, replace=False, random_state=fold_seed)
-    train_val = df[~df.index.isin(test.index)]
+def create_fold(dataframe, fold_seed, frac):
+    _, val_frac, test_frac = frac
+    test = dataframe.sample(frac=test_frac, replace=False, random_state=fold_seed)
+    train_val = dataframe[~dataframe.index.isin(test.index)]
     val = train_val.sample(
         frac=val_frac / (1 - test_frac), replace=False, random_state=1
     )
@@ -178,18 +180,18 @@ def create_fold(df, fold_seed, frac):
 
 
 # cold protein
-def create_fold_setting_cold_protein(df, fold_seed, frac):
+def create_fold_setting_cold_protein(dataframe, fold_seed, frac):
     _, val_frac, test_frac = frac
     gene_drop = (
-        df["Target Sequence"]
+        dataframe["Target Sequence"]
         .drop_duplicates()
         .sample(frac=test_frac, replace=False, random_state=fold_seed)
         .values
     )
 
-    test = df[df["Target Sequence"].isin(gene_drop)]
+    test = dataframe[dataframe["Target Sequence"].isin(gene_drop)]
 
-    train_val = df[~df["Target Sequence"].isin(gene_drop)]
+    train_val = dataframe[~dataframe["Target Sequence"].isin(gene_drop)]
 
     gene_drop_val = (
         train_val["Target Sequence"]
@@ -204,18 +206,18 @@ def create_fold_setting_cold_protein(df, fold_seed, frac):
 
 
 # cold drug
-def create_fold_setting_cold_drug(df, fold_seed, frac):
+def create_fold_setting_cold_drug(dataframe, fold_seed, frac):
     _, val_frac, test_frac = frac
     drug_drop = (
-        df["SMILES"]
+        dataframe["SMILES"]
         .drop_duplicates()
         .sample(frac=test_frac, replace=False, random_state=fold_seed)
         .values
     )
 
-    test = df[df["SMILES"].isin(drug_drop)]
+    test = dataframe[dataframe["SMILES"].isin(drug_drop)]
 
-    train_val = df[~df["SMILES"].isin(drug_drop)]
+    train_val = dataframe[~dataframe["SMILES"].isin(drug_drop)]
 
     drug_drop_val = (
         train_val["SMILES"]
@@ -238,7 +240,8 @@ def encode_drug(
         unique = pd.Series(df_data[column_name].unique()).apply(trans_drug)
         unique_dict = dict(zip(df_data[column_name].unique(), unique))
         df_data[save_column_name] = [unique_dict[i] for i in df_data[column_name]]
-        # the embedding is large and not scalable but quick, so we move to encode in dataloader batch.
+        # the embedding is large and not scalable but quick,
+        # so we move to encode in dataloader batch.
     else:
         raise AttributeError("Please use the correct drug encoding available!")
     return df_data
@@ -256,7 +259,8 @@ def encode_protein(
         AA = pd.Series(df_data[column_name].unique()).apply(trans_protein)
         AA_dict = dict(zip(df_data[column_name].unique(), AA))
         df_data[save_column_name] = [AA_dict[i] for i in df_data[column_name]]
-        # the embedding is large and not scalable but quick, so we move to encode in dataloader batch.
+        # the embedding is large and not scalable but quick,
+        # so we move to encode in dataloader batch.
 
     else:
         raise AttributeError("Please use the correct protein encoding available!")
@@ -288,24 +292,23 @@ def convert_y_unit(y, from_, to_):
 
 
 def data_process(
-    X_drug=None,
-    X_target=None,
+    var_x_drug=None,
+    var_x_target=None,
     y=None,
     drug_encoding=None,
     target_encoding=None,
     split_method="random",
-    frac=[0.7, 0.1, 0.2],
+    frac=(0.7, 0.1, 0.2),
     random_seed=1,
     sample_frac=1,
-    mode="DTI",
     X_drug_=None,
     X_target_=None,
 ):
 
     if random_seed == "TDC":
         random_seed = 1234
-    # property_prediction_flag = X_target is None
-    property_prediction_flag, function_prediction_flag, DDI_flag, PPI_flag, DTI_flag = (
+    # property_prediction_flag = var_x_target is None
+    property_prediction_flag, function_prediction_flag, ddi_flag, ppi_flag, DTI_flag = (
         False,
         False,
         False,
@@ -313,41 +316,44 @@ def data_process(
         False,
     )
 
-    if (X_target is None) and (X_drug is not None) and (X_drug_ is None):
+    if (var_x_target is None) and (var_x_drug is not None) and (X_drug_ is None):
         property_prediction_flag = True
-    elif (X_target is not None) and (X_drug is None) and (X_target_ is None):
+    elif (var_x_target is not None) and (var_x_drug is None) and (X_target_ is None):
         function_prediction_flag = True
-    elif (X_drug is not None) and (X_drug_ is not None):
-        DDI_flag = True
-        if (X_drug is None) or (X_drug_ is None):
-            raise AttributeError("Drug pair sequence should be in X_drug, X_drug_")
-    elif (X_target is not None) and (X_target_ is not None):
-        PPI_flag = True
-        if (X_target is None) or (X_target_ is None):
+    elif (var_x_drug is not None) and (X_drug_ is not None):
+        ddi_flag = True
+        if (var_x_drug is None) or (X_drug_ is None):
+            raise AttributeError("Drug pair sequence should be in var_x_drug, X_drug_")
+    elif (var_x_target is not None) and (X_target_ is not None):
+        ppi_flag = True
+        if (var_x_target is None) or (X_target_ is None):
             raise AttributeError(
-                "Target pair sequence should be in X_target, X_target_"
+                "Target pair sequence should be in var_x_target, X_target_"
             )
-    elif (X_drug is not None) and (X_target is not None):
+    elif (var_x_drug is not None) and (var_x_target is not None):
         DTI_flag = True
-        if (X_drug is None) or (X_target is None):
-            raise AttributeError("Target pair sequence should be in X_target, X_drug")
+        if (var_x_drug is None) or (var_x_target is None):
+            raise AttributeError(
+                "Target pair sequence should be in var_x_target, var_x_drug"
+            )
     else:
         raise AttributeError(
-            "Please use the correct mode. Currently, we support DTI, DDI, PPI, Drug Property Prediction and Protein Function Prediction..."
+            """Please use the correct mode. Currently, we support
+            DTI, DDI, PPI, Drug Property Prediction and Protein Function Prediction..."""
         )
 
     if split_method == "repurposing_VS":
-        y = [-1] * len(X_drug)  # create temp y for compatitibility
+        y = [-1] * len(var_x_drug)  # create temp y for compatitibility
 
     if DTI_flag:
         print("Drug Target Interaction Prediction Mode...")
-        if isinstance(X_target, str):
-            X_target = [X_target]
-        if len(X_target) == 1:
+        if isinstance(var_x_target, str):
+            var_x_target = [var_x_target]
+        if len(var_x_target) == 1:
             # one target high throughput screening setting
-            X_target = np.tile(X_target, (length_func(X_drug),))
+            var_x_target = np.tile(var_x_target, (length_func(var_x_drug),))
 
-        df_data = pd.DataFrame(zip(X_drug, X_target, y))
+        df_data = pd.DataFrame(zip(var_x_drug, var_x_target, y))
         df_data.rename(
             columns={0: "SMILES", 1: "Target Sequence", 2: "Label"}, inplace=True
         )
@@ -355,27 +361,27 @@ def data_process(
 
     elif property_prediction_flag:
         print("Drug Property Prediction Mode...")
-        df_data = pd.DataFrame(zip(X_drug, y))
+        df_data = pd.DataFrame(zip(var_x_drug, y))
         df_data.rename(columns={0: "SMILES", 1: "Label"}, inplace=True)
         print("in total: " + str(len(df_data)) + " drugs")
     elif function_prediction_flag:
         print("Protein Function Prediction Mode...")
-        df_data = pd.DataFrame(zip(X_target, y))
+        df_data = pd.DataFrame(zip(var_x_target, y))
         df_data.rename(columns={0: "Target Sequence", 1: "Label"}, inplace=True)
         print("in total: " + str(len(df_data)) + " proteins")
-    elif PPI_flag:
+    elif ppi_flag:
         print("Protein Protein Interaction Prediction Mode...")
 
-        df_data = pd.DataFrame(zip(X_target, X_target_, y))
+        df_data = pd.DataFrame(zip(var_x_target, X_target_, y))
         df_data.rename(
             columns={0: "Target Sequence 1", 1: "Target Sequence 2", 2: "Label"},
             inplace=True,
         )
         print("in total: " + str(len(df_data)) + " protein-protein pairs")
-    elif DDI_flag:
+    elif ddi_flag:
         print("Drug Drug Interaction Prediction Mode...")
 
-        df_data = pd.DataFrame(zip(X_drug, X_drug_, y))
+        df_data = pd.DataFrame(zip(var_x_drug, X_drug_, y))
         df_data.rename(columns={0: "SMILES 1", 1: "SMILES 2", 2: "Label"}, inplace=True)
         print("in total: " + str(len(df_data)) + " drug-drug pairs")
 
@@ -386,10 +392,10 @@ def data_process(
     if DTI_flag:
         df_data = encode_drug(df_data, drug_encoding)
         df_data = encode_protein(df_data, target_encoding)
-    elif DDI_flag:
+    elif ddi_flag:
         df_data = encode_drug(df_data, drug_encoding, "SMILES 1", "drug_encoding_1")
         df_data = encode_drug(df_data, drug_encoding, "SMILES 2", "drug_encoding_2")
-    elif PPI_flag:
+    elif ppi_flag:
         df_data = encode_protein(
             df_data, target_encoding, "Target Sequence 1", "target_encoding_1"
         )
@@ -441,12 +447,12 @@ def data_process(
             raise AttributeError(
                 "Please select one of the three split method: random, cold_drug, cold_target!"
             )
-    elif DDI_flag:
+    elif ddi_flag:
         if split_method == "random":
             train, val, test = create_fold(df_data, random_seed, frac)
         elif split_method == "no_split":
             return df_data.reset_index(drop=True)
-    elif PPI_flag:
+    elif ppi_flag:
         if split_method == "random":
             train, val, test = create_fold(df_data, random_seed, frac)
         elif split_method == "no_split":
@@ -476,12 +482,12 @@ def data_process(
     )
 
 
-def protein_2_embed(x):
-    return enc_protein.transform(np.array(x).reshape(-1, 1)).toarray().T
+def protein_2_embed(var_x):
+    return enc_protein.transform(np.array(var_x).reshape(-1, 1)).toarray().T
 
 
-def drug_2_embed(x):
-    return enc_drug.transform(np.array(x).reshape(-1, 1)).toarray().T
+def drug_2_embed(var_x):
+    return enc_drug.transform(np.array(var_x).reshape(-1, 1)).toarray().T
 
 
 def generate_config(
@@ -492,15 +498,15 @@ def generate_config(
     input_dim_protein=8420,
     hidden_dim_drug=256,
     hidden_dim_protein=256,
-    cls_hidden_dims=[1024, 1024, 512],
+    cls_hidden_dims=(1024, 1024, 512),
     batch_size=256,
     train_epoch=10,
     test_every_X_epoch=20,
     LR=1e-4,
-    cnn_drug_filters=[32, 64, 96],
-    cnn_drug_kernels=[4, 6, 8],
-    cnn_target_filters=[32, 64, 96],
-    cnn_target_kernels=[4, 8, 12],
+    cnn_drug_filters=(32, 64, 96),
+    cnn_drug_kernels=(4, 6, 8),
+    cnn_target_filters=(32, 64, 96),
+    cnn_target_kernels=(4, 8, 12),
     num_workers=0,
     cuda_id=None,
 ):
@@ -545,11 +551,11 @@ def generate_config(
 
 
 class data_process_loader(data.Dataset):
-    def __init__(self, list_IDs, labels, df, **config):
+    def __init__(self, list_IDs, labels, dataframe, **config):
         "Initialization"
         self.labels = labels
         self.list_IDs = list_IDs
-        self.df = df
+        self.dataframe = dataframe
         self.config = config
 
     def __len__(self):
@@ -559,13 +565,13 @@ class data_process_loader(data.Dataset):
     def __getitem__(self, index):
         "Generates one sample of data"
         index = self.list_IDs[index]
-        v_d = self.df.iloc[index]["drug_encoding"]
+        v_d = self.dataframe.iloc[index]["drug_encoding"]
         if (
             self.config["drug_encoding"] == "CNN"
             or self.config["drug_encoding"] == "CNN_RNN"
         ):
             v_d = drug_2_embed(v_d)
-        v_p = self.df.iloc[index]["target_encoding"]
+        v_p = self.dataframe.iloc[index]["target_encoding"]
         if (
             self.config["target_encoding"] == "CNN"
             or self.config["target_encoding"] == "CNN_RNN"

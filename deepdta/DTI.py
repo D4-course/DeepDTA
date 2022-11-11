@@ -1,3 +1,6 @@
+"""Module containing the DeepDTA model."""
+
+
 import copy
 import os
 import pickle
@@ -26,7 +29,7 @@ np.random.seed(3)
 
 class Classifier(nn.Sequential):
     def __init__(self, model_drug, model_protein, **config):
-        super(Classifier, self).__init__()
+        super().__init__()
         self.input_dim_drug = config["hidden_dim_drug"]
         self.input_dim_protein = config["hidden_dim_protein"]
 
@@ -116,7 +119,7 @@ class DBTA:
         if "decay" not in self.config.keys():
             self.config["decay"] = 0
 
-    def test_(self, data_generator, model, repurposing_mode=False, test=False):
+    def test_(self, data_generator, model, repurposing_mode=False):
         y_pred = []
         y_label = []
         model.eval()
@@ -134,7 +137,6 @@ class DBTA:
             label_ids = label.to("cpu").numpy()
             y_label = y_label + label_ids.flatten().tolist()
             y_pred = y_pred + logits.flatten().tolist()
-            outputs = np.asarray([1 if i else 0 for i in (np.asarray(y_pred) >= 0.5)])
         model.train()
         if repurposing_mode:
             return y_pred
@@ -153,10 +155,6 @@ class DBTA:
         decay = self.config["decay"]
         BATCH_SIZE = self.config["batch_size"]
         train_epoch = self.config["train_epoch"]
-        if "test_every_X_epoch" in self.config.keys():
-            test_every_X_epoch = self.config["test_every_X_epoch"]
-        else:
-            test_every_X_epoch = 40
         loss_history = []
 
         self.model = self.model.to(self.device)
@@ -218,7 +216,7 @@ class DBTA:
             )
 
         # early stopping
-        max_MSE = 10000
+        max_mse = 10000
         model_max = copy.deepcopy(self.model)
 
         valid_metric_record = []
@@ -281,9 +279,9 @@ class DBTA:
                         map(float2str, [mse, r2, p_val, CI])
                     )
                     valid_metric_record.append(lst)
-                    if mse < max_MSE:
+                    if mse < max_mse:
                         model_max = copy.deepcopy(self.model)
-                        max_MSE = mse
+                        max_mse = mse
                     if verbose:
                         print(
                             "Validation at Epoch "
@@ -315,15 +313,13 @@ class DBTA:
             prettytable_file = os.path.join(
                 self.result_folder, "valid_markdowntable.txt"
             )
-            with open(prettytable_file, "w") as fp:
+            with open(prettytable_file, "w", encoding="utf8") as fp:
                 fp.write(table.get_string())
 
         if test is not None:
             if verbose:
                 print("--- Go for Testing ---")
-            mse, r2, p_val, CI, logits, loss_test = self.test_(
-                testing_generator, model_max
-            )
+            mse, r2, p_val, CI, logits, _ = self.test_(testing_generator, model_max)
             test_table = PrettyTable(
                 ["MSE", "Pearson Correlation", "with p-value", "Concordance Index"]
             )
@@ -356,7 +352,7 @@ class DBTA:
             prettytable_file = os.path.join(
                 self.result_folder, "test_markdowntable.txt"
             )
-            with open(prettytable_file, "w") as fp:
+            with open(prettytable_file, "w", encoding="utf8") as fp:
                 fp.write(test_table.get_string())
 
         ### 2. learning curve

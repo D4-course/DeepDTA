@@ -1,9 +1,11 @@
+""" Main module to predict binding affinity or to train the model"""
+
 import argparse
 import sys
 
 
 import deepdta.DTI as models
-from deepdta.dataset import load_process_DAVIS
+from deepdta.dataset import load_process_davis
 from deepdta.utils import (
     data_process,
     generate_config,
@@ -11,26 +13,27 @@ from deepdta.utils import (
     is_valid_protein,
 )
 
-drug_encoding = "CNN"
-target_encoding = "CNN"
+DRUG_ENCODING = "CNN"
+TARGET_ENCODING = "CNN"
 
 
 def train_model():
-    X_drug, X_target, y = load_process_DAVIS("./data/", binary=False)
+    """Train the model"""
+    var_x_drug, var_x_target, var_y = load_process_davis("./data/")
     train, val, test = data_process(
-        X_drug,
-        X_target,
-        y,
-        drug_encoding,
-        target_encoding,
+        var_x_drug,
+        var_x_target,
+        var_y,
+        DRUG_ENCODING,
+        TARGET_ENCODING,
         split_method="random",
         frac=[0.7, 0.1, 0.2],
     )
 
     # use the parameters setting provided in the paper: https://arxiv.org/abs/1801.10193
     config = generate_config(
-        drug_encoding=drug_encoding,
-        target_encoding=target_encoding,
+        drug_encoding=DRUG_ENCODING,
+        target_encoding=TARGET_ENCODING,
         cls_hidden_dims=[1024, 1024, 512],
         train_epoch=100,
         LR=0.001,
@@ -46,13 +49,19 @@ def train_model():
     model.save_model("./weights/")
 
 
-def predict_dta(X_drug, X_target):
-    y = [0] * (len(X_drug) * len(X_target))
-    X_pred = data_process(
-        X_drug, X_target, y, drug_encoding, target_encoding, split_method="no_split"
+def predict_dta(var_x_drug, var_x_target):
+    """Predict binding affinity"""
+    var_y = [0] * (len(var_x_drug) * len(var_x_target))
+    var_x_pred = data_process(
+        var_x_drug,
+        var_x_target,
+        var_y,
+        DRUG_ENCODING,
+        TARGET_ENCODING,
+        split_method="no_split",
     )
     model = models.model_pretrained("./weights/")
-    y_pred = model.predict(X_pred)
+    y_pred = model.predict(var_x_pred)
     return y_pred
 
 
@@ -70,23 +79,24 @@ def arg_parser():
 
 
 def main():
+    """Entrypoint function"""
     parser = arg_parser()
-    X_drug = parser.parse_args().drug
-    X_target = parser.parse_args().target
-    if not X_drug:
+    var_x_drug = parser.parse_args().drug
+    var_x_target = parser.parse_args().target
+    if not var_x_drug:
         print("Please provide a drug SMILES")
         sys.exit(0)
-    if not X_target:
+    if not var_x_target:
         print("Please provide a target(protein) sequence")
         sys.exit(0)
-    if not is_valid_smiles(X_drug):
-        print(f"Invalid drug SMILES - {X_drug}")
+    if not is_valid_smiles(var_x_drug):
+        print(f"Invalid drug SMILES - {var_x_drug}")
         sys.exit(0)
-    if not is_valid_protein(X_target):
-        print(f"Invalid protein sequence - {X_target}")
+    if not is_valid_protein(var_x_target):
+        print(f"Invalid protein sequence - {var_x_target}")
         sys.exit(0)
     try:
-        y_pred = predict_dta([X_drug], [X_target])
+        y_pred = predict_dta([var_x_drug], [var_x_target])
         print(f"Predicted affinity: {y_pred[0]}")
     except Exception as err:
         print(err)

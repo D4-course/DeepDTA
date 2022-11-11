@@ -1,3 +1,5 @@
+"""Module for encoding protein sequences and ligands."""
+
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -14,6 +16,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class CNN(nn.Sequential):
+    """Convolutional neural network for encoding protein sequences and ligands."""
+
     def __init__(self, encoding, **config):
         super().__init__()
         if encoding == "drug":
@@ -55,17 +59,17 @@ class CNN(nn.Sequential):
             self.fc1 = nn.Linear(n_size_p, config["hidden_dim_protein"])
 
     def _get_conv_output(self, shape):
-        bs = 1
-        inp = Variable(torch.rand(bs, *shape))
+        var_bs = 1
+        inp = Variable(torch.rand(var_bs, *shape))
         output_feat = self._forward_features(inp.double())
-        n_size = output_feat.data.view(bs, -1).size(1)
+        n_size = output_feat.data.view(var_bs, -1).size(1)
         return n_size
 
-    def _forward_features(self, x):
-        for l in self.conv:
-            x = F.relu(l(x))
-        x = F.adaptive_max_pool1d(x, output_size=1)
-        return x
+    def _forward_features(self, var_x):
+        for layer in self.conv:
+            var_x = F.relu(layer(var_x))
+        var_x = F.adaptive_max_pool1d(var_x, output_size=1)
+        return var_x
 
     def forward(self, v):
         v = self._forward_features(v.double())
