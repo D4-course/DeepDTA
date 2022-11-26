@@ -12,3 +12,8 @@ tensorboard==2.11.0
 torch==1.12.1+cpu
 wget==3.2
 
+
+fastapi==0.64.0
+httptools
+httpx
+uvicorn
